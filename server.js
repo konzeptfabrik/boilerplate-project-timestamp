@@ -1,53 +1,66 @@
-// server.js
-// where your node app starts
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const app = express();
+var bodyParser = require("body-parser");
+const Database = require("@replit/database");
+const shortid = require("shortid");
 
-// init project
-var express = require("express");
-var app = express();
+const db = new Database();
 
-// enable CORS (https://en.wikipedia.org/wiki/Cross-origin_resource_sharing)
-// so that your API is remotely testable by FCC
-var cors = require("cors");
-app.use(cors({ optionsSuccessStatus: 200 })); // some legacy browsers choke on 204
+// Basic Configuration
+const port = process.env.PORT || 3000;
 
-// http://expressjs.com/en/starter/static-files.html
-app.use(express.static("public"));
+var urlencodedParser = bodyParser.urlencoded({ extended: false });
 
-// http://expressjs.com/en/starter/basic-routing.html
+app.use(cors());
+
+app.use("/public", express.static(`${process.cwd()}/public`));
+
 app.get("/", function (req, res) {
-	res.sendFile(__dirname + "/views/index.html");
+	res.sendFile(process.cwd() + "/views/index.html");
 });
 
-app.get("/api/:date?", function (req, res) {
-	if (!req.params.date) {
-		const date = new Date();
+app.get("/api/shorturl/:url", function (req, res) {
+	const shortUrl = req.params.url;
+
+	db.get(shortUrl).then((value) => {
+		console.log(value);
+
+		res.redirect(value);
+	});
+});
+
+app.post("/api/shorturl", urlencodedParser, async function (req, res) {
+	const originalUrl = req.body.url;
+	const shortUrl = shortid.generate();
+
+	const expression =
+		/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/;
+
+	const regex = new RegExp(expression);
+
+	if (!originalUrl.match(regex)) {
 		res.json({
-			unix: date.getTime(),
-			utc: date.toUTCString(),
+			error: "invalid url",
 		});
 		return;
 	}
 
-	const date = isNaN(req.params.date)
-		? new Date(req.params.date)
-		: new Date(parseInt(req.params.date));
-
-	if (!date.getTime()) {
-		res.json({ error: "Invalid Date" });
-		return;
-	}
-
-	const unix = parseInt(date.getTime().toFixed(0));
-
-	const utc = date.toUTCString();
-
-	res.json({
-		unix: unix,
-		utc: utc,
-	});
+	db.set(shortUrl, originalUrl)
+		.then((value) => {
+			res.json({
+				original_url: originalUrl,
+				short_url: shortUrl,
+			});
+		})
+		.catch(() => {
+			res.json({
+				error: "Error!",
+			});
+		});
 });
 
-// listen for requests :)
-var listener = app.listen(process.env.PORT, function () {
-	console.log("Your app is listening on port " + listener.address().port);
+app.listen(port, function () {
+	console.log(`Listening on port ${port}`);
 });
