@@ -18,12 +18,26 @@ app.get("/", function (req, res) {
 	res.sendFile(__dirname + "/views/index.html");
 });
 
-app.get("/api/:date", function (req, res) {
+app.get("/api/:date?", function (req, res) {
+	if (!req.params.date) {
+		const date = new Date();
+		res.json({
+			unix: date.getTime(),
+			utc: date.toUTCString(),
+		});
+		return;
+	}
+
 	const date = isNaN(req.params.date)
 		? new Date(req.params.date)
-		: new Date(req.params.date * 1000);
+		: new Date(parseInt(req.params.date));
 
-	const unix = parseInt((date.getTime() / 1000).toFixed(0));
+	if (!date.getTime()) {
+		res.json({ error: "Invalid Date" });
+		return;
+	}
+
+	const unix = parseInt(date.getTime().toFixed(0));
 
 	const utc = date.toUTCString();
 
